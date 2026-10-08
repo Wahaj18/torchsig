@@ -867,9 +867,7 @@ def test_iq_imbalance(data: Any, params: dict, expected: bool, is_error: bool) -
         i_rms = np.sqrt(np.mean(np.real(probe_out) ** 2))
         q_rms = np.sqrt(np.mean(np.imag(probe_out) ** 2))
         measured_db = 20.0 * np.log10(i_rms / q_rms)
-        assert np.isclose(measured_db, amplitude_imbalance, atol=1e-6), (
-            f"I/Q amplitude imbalance {measured_db} dB != requested {amplitude_imbalance} dB"
-        )
+        assert np.isclose(measured_db, amplitude_imbalance, atol=1e-6), f"I/Q amplitude imbalance {measured_db} dB != requested {amplitude_imbalance} dB"
 
         data = iq_imbalance(data, amplitude_imbalance=amplitude_imbalance, phase_imbalance=phase_imbalance, dc_offset_db=dc_offset_db, dc_offset_phase_rads=dc_offset_phase_rads)
 
