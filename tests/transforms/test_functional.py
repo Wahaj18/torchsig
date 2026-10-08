@@ -842,7 +842,6 @@ def test_iq_imbalance(data: Any, params: dict, expected: bool, is_error: bool) -
 
     """
     amplitude_imbalance = params["amplitude_imbalance"]
-    amplitude_imbalance_linear = 10 ** (amplitude_imbalance / 10.0)
     phase_imbalance = params["phase_imbalance"]
     dc_offset_db = params["dc_offset_db"]
     dc_offset_phase_rads = params["dc_offset_phase_rads"]
@@ -852,6 +851,25 @@ def test_iq_imbalance(data: Any, params: dict, expected: bool, is_error: bool) -
             data = iq_imbalance(data, amplitude_imbalance=amplitude_imbalance, phase_imbalance=phase_imbalance, dc_offset_db=dc_offset_db, dc_offset_phase_rads=dc_offset_phase_rads)
     else:
         data_test = data.copy()
+
+        # With zero phase imbalance and negligible DC offset, the I/Q RMS
+        # voltage ratio of a balanced tone must equal amplitude_imbalance (dB).
+        n = 4096
+        t = np.arange(n)
+        probe = (np.cos(2 * np.pi * t / 32) + 1j * np.sin(2 * np.pi * t / 32)).astype(TorchSigComplexDataType)
+        probe_out = iq_imbalance(
+            probe,
+            amplitude_imbalance=amplitude_imbalance,
+            phase_imbalance=0.0,
+            dc_offset_db=-200.0,
+            dc_offset_phase_rads=0.0,
+        )
+        i_rms = np.sqrt(np.mean(np.real(probe_out) ** 2))
+        q_rms = np.sqrt(np.mean(np.imag(probe_out) ** 2))
+        measured_db = 20.0 * np.log10(i_rms / q_rms)
+        assert np.isclose(measured_db, amplitude_imbalance, atol=1e-6), (
+            f"I/Q amplitude imbalance {measured_db} dB != requested {amplitude_imbalance} dB"
+        )
 
         data = iq_imbalance(data, amplitude_imbalance=amplitude_imbalance, phase_imbalance=phase_imbalance, dc_offset_db=dc_offset_db, dc_offset_phase_rads=dc_offset_phase_rads)
 
