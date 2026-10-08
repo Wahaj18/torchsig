@@ -6,10 +6,12 @@ import numpy as np
 import pytest
 import torch
 
+from torchsig.signals.signal_types import Signal
 from torchsig.utils import dsp
 from torchsig.utils.dsp import (
     TorchSigComplexDataType,
     compute_spectrogram,
+    update_signal_snr_bandwidth,
 )
 
 FFT_SIZE = 64
@@ -284,9 +286,6 @@ def test_update_signal_snr_averages_spectrogram_in_linear_power() -> None:
     For a bin that is hot in only one frame (as with a sweep), a mean of dB
     values is pulled toward the empty frames and over-boosts the signal.
     """
-    from torchsig.signals.signal_types import Signal
-    from torchsig.utils.dsp import update_signal_snr_bandwidth
-
     fft_size = 8
     n_frames = 4
     peak_bin = 2
@@ -326,7 +325,7 @@ def test_update_signal_snr_averages_spectrogram_in_linear_power() -> None:
         with pytest.MonkeyPatch.context() as mp:
             mp.setattr(
                 "torchsig.utils.dsp.compute_spectrogram",
-                lambda *args, **kwargs: spectrogram_db.copy(),
+                lambda *_args, **_kwargs: spectrogram_db.copy(),
             )
             update_signal_snr_bandwidth(dataset, signal)
 
