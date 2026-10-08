@@ -276,3 +276,77 @@ def test_float32_polyphase_filter_preserves_spectral_performance() -> None:
     for edge in (passband_edge, stopband_edge):
         edge_index = int(np.argmin(np.abs(frequencies - edge)))
         assert response32_db[edge_index] == pytest.approx(responses_db[np.float64][edge_index], abs=0.1)
+
+
+
+def test_update_signal_snr_averages_spectrogram_in_linear_power() -> None:
+    """SNR correction must average the spectrogram in linear power (#488).
+
+    For a bin that is hot in only one frame (as with a sweep), a mean of dB
+    values is pulled toward the empty frames and over-boosts the signal.
+    """
+    from torchsig.signals.signal_types import Signal
+    from torchsig.utils.dsp import update_signal_snr_bandwidth
+
+    fft_size = 8
+    n_frames = 4
+    peak_bin = 2
+    hot_db = 30.0
+    cold_db = -60.0
+    noise_power_db = 0.0
+    target_snr_db = 10.0
+
+    # Bin occupied in every frame: both averages give hot_db.
+    stationary = np.full((fft_size, n_frames), cold_db, dtype=np.float64)
+    stationary[peak_bin, :] = hot_db
+
+    # Bin occupied in one frame: the linear mean is ~24 dB, while the mean of
+    # dB values is -37.5 dB and would request a ~68 dB larger boost.
+    swept = np.full((fft_size, n_frames), cold_db, dtype=np.float64)
+    swept[peak_bin, 0] = hot_db
+
+    def _correction_db(spectrogram_db: np.ndarray) -> float:
+        dataset = Mock()
+        dataset.fft_size = fft_size
+        dataset.fft_stride = fft_size
+        dataset.noise_power_db = noise_power_db
+        dataset.sample_rate = 1.0
+        dataset.frequency_min = -0.5
+        dataset.frequency_max = 0.5
+        dataset.random_generator = Mock()
+        dataset.random_generator.uniform = Mock(return_value=target_snr_db)
+
+        signal = Signal(
+            data=np.ones(fft_size * n_frames, dtype=np.complex64),
+            center_freq=0.0,
+            bandwidth=0.25,
+        )
+        signal["snr_db_min"] = target_snr_db
+        signal["snr_db_max"] = target_snr_db
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(
+                "torchsig.utils.dsp.compute_spectrogram",
+                lambda *args, **kwargs: spectrogram_db.copy(),
+            )
+            update_signal_snr_bandwidth(dataset, signal)
+
+        scale = float(np.abs(signal.data[0]))
+        return 20.0 * np.log10(scale)
+
+    corr_stationary = _correction_db(stationary)
+    corr_swept = _correction_db(swept)
+
+    # Stationary: estimate ≈ 30 dB, target 10 dB → about -20 dB correction.
+    assert corr_stationary == pytest.approx(target_snr_db - hot_db, abs=0.2)
+
+    # Swept: peak-bin linear mean is (10^3 + 3 * 10^-6) / 4 ~ 250 (~24 dB).
+    linear_mean_db = 10 * np.log10(
+        (10 ** (hot_db / 10.0) + 3 * 10 ** (cold_db / 10.0)) / n_frames
+    )
+    assert corr_swept == pytest.approx(target_snr_db - linear_mean_db, abs=0.2)
+
+    db_mean_db = (hot_db + 3 * cold_db) / n_frames
+    db_mean_correction = target_snr_db - db_mean_db
+    # Guard against regressing to the old geometric-mean behaviour.
+    assert abs(corr_swept - db_mean_correction) > 50.0
