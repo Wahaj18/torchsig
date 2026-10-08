@@ -1463,10 +1463,7 @@ def update_signal_snr_bandwidth(dataset: "TorchSigIterableDataset", new_signal: 
     )
     # Average over time in linear power, then convert once. A mean of dB
     # values is a geometric mean and underestimates swept signals (#488).
-    signal_avg_fft_db = 10 * np.log10(
-        np.mean(10 ** (signal_spectrogram_db / 10.0), axis=1)
-        + np.finfo(np.float64).tiny
-    )
+    signal_avg_fft_db = 10 * np.log10(np.mean(10 ** (signal_spectrogram_db / 10.0), axis=1) + np.finfo(np.float64).tiny)
     # estimate the frequency response maximum value
     max_value_db = np.max(signal_avg_fft_db)
     # estimate SNR

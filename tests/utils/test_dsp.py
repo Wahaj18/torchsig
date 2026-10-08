@@ -278,7 +278,6 @@ def test_float32_polyphase_filter_preserves_spectral_performance() -> None:
         assert response32_db[edge_index] == pytest.approx(responses_db[np.float64][edge_index], abs=0.1)
 
 
-
 def test_update_signal_snr_averages_spectrogram_in_linear_power() -> None:
     """SNR correction must average the spectrogram in linear power (#488).
 
@@ -341,9 +340,7 @@ def test_update_signal_snr_averages_spectrogram_in_linear_power() -> None:
     assert corr_stationary == pytest.approx(target_snr_db - hot_db, abs=0.2)
 
     # Swept: peak-bin linear mean is (10^3 + 3 * 10^-6) / 4 ~ 250 (~24 dB).
-    linear_mean_db = 10 * np.log10(
-        (10 ** (hot_db / 10.0) + 3 * 10 ** (cold_db / 10.0)) / n_frames
-    )
+    linear_mean_db = 10 * np.log10((10 ** (hot_db / 10.0) + 3 * 10 ** (cold_db / 10.0)) / n_frames)
     assert corr_swept == pytest.approx(target_snr_db - linear_mean_db, abs=0.2)
 
     db_mean_db = (hot_db + 3 * cold_db) / n_frames
